@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>NPSH 計算ツール</title>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- MathJax（数式表示） -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- 左側：入力欄 -->
+  <div class="left-panel">
+
+    <h2>入力</h2>
+
+    <div class="row">
+      <label>温度 [℃]</label>
+      <input id="temp" type="number" value="20" oninput="updatePv()">
+    </div>
+    <div class="help">液温。Pv（蒸気圧）計算に使用。</div>
+
+    <div class="row">
+      <label>Pv [Pa]</label>
+      <input id="pv" type="number" readonly>
+    </div>
+    <div class="help">蒸気圧。温度から自動計算。</div>
+
+    <div class="row">
+      <label>Pa &#91;Pa&#93;</label>
+      <input id="pa" type="number" value="101325">
+    </div>
+    <div class="help">大気圧。標準は 101325 Pa。</div>
+
+    <div class="row">
+      <label>ρ [kg/m³]</label>
+      <input id="rho" type="number" value="1000">
+    </div>
+    <div class="help">液体の密度。水は約 1000 kg/m³。</div>
+
+    <div class="row">
+      <label>g [m/s²]</label>
+      <input id="g" type="number" value="9.8">
+    </div>
+    <div class="help">重力加速度。標準は 9.8 m/s²。</div>
+
+    <div class="row">
+      <label>Hs [m]</label>
+      <input id="hs" type="number" value="0">
+    </div>
+    <div class="help">静水頭。＋押し込み／−吸上げ。</div>
+
+    <div class="row">
+      <label>Hf [m]</label>
+      <input id="hf" type="number" value="1.0">
+    </div>
+    <div class="help">吸込損失水頭（配管・バルブの損失）。</div>
+
+    <h2>ポンプ仕様</h2>
+
+    <!-- 方式選択 -->
+    <div class="row">
+      <label>NPSHr 方式</label>
+      <select id="method" onchange="switchMethod()">
+        <option value="A">方式A（メーカー値）</option>
+        <option value="B">方式B（比速度 Ns）</option>
+        <option value="C" selected>方式C（経験式）</option>
+      </select>
+    </div>
+    <div class="help">NPSHr の算出方法を選択。</div>
+
+    <!-- 方式A：メーカー値 -->
+    <div class="row method-A">
+      <label>NPSHr [m]</label>
+      <input id="npshrA" type="number" step="0.01">
+    </div>
+    <div class="help method-A">メーカー仕様書に記載の NPSHr を直接入力。</div>
+
+    <!-- 方式B：比速度 Ns -->
+    <div class="row method-B">
+      <label>比速度 Ns</label>
+      <input id="ns" type="number" step="1">
+    </div>
+    <div class="help method-B">
+      比速度 Ns を用いて NPSHr を推定します。<br>
+      Ns はポンプの形状・特性を表す指標で、次式で定義されます：<br>
+      Ns = n × √Q / H^(3/4)<br>
+      （n：回転数 [rpm], Q：流量 [m³/s], H：揚程 [m]）<br>
+      本ツールでは一般渦巻ポンプ向け経験式<br>
+      NPSHr = 0.0003 × Ns^1.5 を使用します。
+    </div>
+
+    <!-- 方式C：経験式 -->
+    <div class="row method-C">
+      <label>Q [m³/min]</label>
+      <input id="q" type="number" value="1.0">
+    </div>
+    <div class="help method-C">流量。単位は m³/min。</div>
+
+    <div class="row method-C">
+      <label>n [rpm]</label>
+      <input id="n" type="number" value="1760">
+    </div>
+    <div class="help method-C">回転数 [rpm]。</div>
+
+    <div class="row method-C">
+      <label>D [mm]</label>
+      <input id="d" type="number" value="198">
+    </div>
+    <div class="help method-C">羽根車径 [mm]。</div>
+
+    <div class="row method-C">
+      <label>C 係数</label>
+      <input id="c" type="number" step="0.01" value="0.35">
+    </div>
+    <div class="help method-C">経験係数。一般渦巻ポンプは 0.25〜0.40。</div>
+
+    <button onclick="calcAll()">計算</button>
+
+    <h2>結果</h2>
+    <p>NPSHa：<span id="result-npsha">-</span> m</p>
+    <p>NPSHr：<span id="result-npshr">-</span> m</p>
+    <p>マージン：<span id="result-margin">-</span> m</p>
+    <p id="judge"></p>
+
+  </div>
+
+  <!-- 右側：数式 + 説明 -->
+  <div class="right-panel">
+
+    <h2 class="right-title">NPSH 計算式と説明</h2>
+
+    <div class="formula">
+      \[
+        \text{NPSHa} = \frac{Pa - Pv}{\rho g} + H_s - H_f
+      \]
+    </div>
+
+    <div class="formula">
+      \[
+        \text{NPSHr}_{(方式C)} = C \cdot Q^{0.5} \cdot n^{0.75} \cdot D^2
+      \]
+    </div>
+
+    <div class="formula">
+      \[
+        \text{NPSHr}_{(方式B)} = 0.0003 \cdot Ns^{1.5}
+      \]
+    </div>
+
+    <div class="description">
+      <h3>NPSHとは</h3>
+
+      <p><b>NPSHa（有効吸込ヘッド）</b>は、ポンプ吸込口で液体が沸騰せずに流れ込むための「圧力の余裕」。</p>
+
+      <p><b>NPSHr（必要吸込ヘッド）</b>は、キャビテーションを起こさずに運転するために必要な最小値。</p>
+
+      <p><b>NPSH マージン</b>（NPSHa − NPSHr）は温度によって必要な安全率が変わる。</p>
+
+      <ul>
+        <li>〜40℃：1.3 × NPSHr 以上</li>
+        <li>40〜60℃：1.5 × NPSHr 以上</li>
+        <li>60℃以上：2.0 × NPSHr 以上</li>
+      </ul>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
